@@ -39,6 +39,12 @@ node_modules/
 .vscode/
 .idea/
 
+# Development testing (not in repo)
+Dockerfile*
+docker-compose*.yml
+.devcontainer/
+*test*.sh
+
 # Build artifacts
 build/
 dist/
