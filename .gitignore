@@ -1,0 +1,66 @@
+# NeoCode .gitignore
+
+# Neovim
+*.swp
+*.swo
+*~
+.nvimlog
+.netrwhist
+
+# tmux
+.tmux/
+sessions/
+*.tmux.conf.local
+
+# System files
+.DS_Store
+Thumbs.db
+*.tmp
+*.temp
+
+# Logs
+*.log
+logs/
+debug.log
+
+# Local configuration
+.neocode.local.yaml
+.neocode.local.lua
+local_settings.lua
+
+# User data
+.local/
+data/
+cache/
+sessions/
+
+# Development
+node_modules/
+.vscode/
+.idea/
+
+# Build artifacts
+build/
+dist/
+target/
+
+# Language specific
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.pytest_cache/
+
+# Environment
+.env
+.env.local
+.envrc
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# Package managers
+lazy-lock.json
+packer_compiled.lua

@@ -1,0 +1,28 @@
+# Project Template Configuration
+# Default settings for new projects
+
+editor:
+  theme: "catppuccin-mocha"
+  font_size: 14
+  tab_size: 2
+  auto_save: true
+  format_on_save: true
+
+lsp:
+  servers:
+    - lua_ls
+    - pyright
+    - tsserver
+  
+keymaps:
+  leader: " "
+  custom:
+    "<leader>ff": "telescope.find_files"
+    "<leader>fg": "telescope.live_grep" 
+    "<leader>e": "nvim_tree.toggle"
+
+plugins:
+  - nvim-tree/nvim-tree.lua
+  - nvim-telescope/telescope.nvim
+  - neovim/nvim-lspconfig
+  - catppuccin/nvim
