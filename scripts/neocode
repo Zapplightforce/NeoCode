@@ -156,156 +156,8 @@ select_project_directory() {
         esac
     done
 }
-# Create enhanced LazyVim configuration for stability and file tree
-create_lazyvim_config() {
-    local project_dir="$1"
-    
-    log "Creating stable LazyVim configuration..."
-    
-    # Create NeoCode-specific LazyVim config
-    mkdir -p "$HOME/.config/nvim/lua/config"
-    mkdir -p "$HOME/.config/nvim/lua/plugins"
-    
-    # Enhanced init.lua with file tree auto-open and stability
-    cat > "$HOME/.config/nvim/lua/config/neocode.lua" << 'EOF'
--- NeoCode LazyVim Configuration
--- Enhanced stability and VSCode-like behavior
 
--- CRITICAL: Disable mouse to prevent accidental exits and instability
-vim.opt.mouse = ""  -- Completely disable mouse in nvim
-
--- Enhanced stability settings (set early)
-vim.opt.backup = false          -- Don't create backup files
-vim.opt.writebackup = false     -- Don't create backup before overwriting
-vim.opt.swapfile = false        -- Don't create swap files
-vim.opt.autowrite = true        -- Auto-save on buffer switch
-vim.opt.confirm = true          -- Confirm before discarding changes
-
--- Better error handling
-vim.opt.errorbells = false
-vim.opt.visualbell = true
-
--- Disable clipboard integration to prevent instability
-vim.opt.clipboard = ""
-
--- Enhanced exit confirmation to prevent accidental exits
-local function confirm_quit()
-  local choice = vim.fn.confirm("Do you want to quit NeoCode?", "&Yes\n&No", 2)
-  if choice == 1 then
-    vim.cmd("qa!")
-  end
-end
-
--- Override default quit commands with confirmation
-vim.keymap.set('n', '<leader>q', confirm_quit, { desc = "Quit with confirmation" })
-vim.keymap.set('n', '<leader>Q', confirm_quit, { desc = "Quit with confirmation" })
-vim.keymap.set('n', 'ZQ', confirm_quit, { desc = "Quit with confirmation" })
-vim.keymap.set('n', 'ZZ', confirm_quit, { desc = "Quit with confirmation" })
-
--- Map Ctrl+Q for safer quit
-vim.keymap.set('n', '<C-q>', confirm_quit, { desc = "Quit NeoCode safely" })
-vim.keymap.set('i', '<C-q>', '<Esc>' .. confirm_quit, { desc = "Quit NeoCode safely" })
-
--- Auto-save on focus lost (prevents data loss)
-vim.api.nvim_create_autocmd("FocusLost", {
-  callback = function()
-    vim.cmd("silent! wa")  -- Save all buffers
-  end,
-})
-
--- Prevent accidental closing of the last buffer
-vim.api.nvim_create_autocmd("BufDelete", {
-  callback = function()
-    local buffers = vim.fn.getbufinfo({buflisted = 1})
-    if #buffers == 1 then
-      -- If this is the last buffer, create a new empty one
-      vim.cmd("enew")
-    end
-  end,
-})
-
-EOF
-    
-    # Create neo-tree plugin override for VSCode-like behavior
-    cat > "$HOME/.config/nvim/lua/plugins/neo-tree.lua" << 'EOF'
--- Neo-tree configuration for VSCode-like file explorer
-return {
-  "nvim-neo-tree/neo-tree.nvim",
-  opts = {
-    close_if_last_window = false, -- Don't close neo-tree if it's the last window
-    enable_git_status = true,
-    enable_diagnostics = true,
-    filesystem = {
-      follow_current_file = {
-        enabled = true, -- Focus on current file in tree
-      },
-      hijack_netrw_behavior = "open_current", -- Use neo-tree instead of netrw
-    },
-    window = {
-      position = "left",
-      width = 35,
-      mappings = {
-        -- Disable closing on quit
-        ["<esc>"] = "noop",
-      },
-    },
-    default_component_configs = {
-      indent = {
-        with_expanders = true,
-        expander_collapsed = "",
-        expander_expanded = "",
-      },
-    },
-  },
-  init = function()
-    -- Auto-open neo-tree on VimEnter
-    vim.api.nvim_create_autocmd("VimEnter", {
-      callback = function()
-        -- Delay to ensure LazyVim is fully loaded
-        vim.defer_fn(function()
-          if vim.fn.argc() == 0 or (vim.fn.argc() == 1 and vim.fn.isdirectory(vim.fn.argv(0)) == 1) then
-            require("neo-tree.command").execute({ action = "show", reveal = true })
-            -- Focus back on main window
-            vim.cmd("wincmd l")
-          end
-        end, 100)
-      end,
-    })
-    
-    -- Keep neo-tree visible
-    vim.api.nvim_create_autocmd("BufEnter", {
-      callback = function()
-        -- Check if neo-tree is open
-        if vim.bo.buftype == "" and vim.bo.filetype ~= "neo-tree" then
-          local neo_tree_open = false
-          for _, win in ipairs(vim.api.nvim_list_wins()) do
-            local buf = vim.api.nvim_win_get_buf(win)
-            if vim.bo[buf].filetype == "neo-tree" then
-              neo_tree_open = true
-              break
-            end
-          end
-          if not neo_tree_open then
-            require("neo-tree.command").execute({ action = "show" })
-            vim.cmd("wincmd l")
-          end
-        end
-      end,
-    })
-  end,
-}
-EOF
-    
-    # Add our config to LazyVim's init
-    if ! grep -q "require.*config.*neocode" "$HOME/.config/nvim/init.lua" 2>/dev/null; then
-        echo "-- NeoCode configuration" >> "$HOME/.config/nvim/init.lua"
-        echo "require('config.neocode')" >> "$HOME/.config/nvim/init.lua"
-    fi
-    
-    log "✅ Stable LazyVim configuration created"
-}
-
-# Create VSCode-like session with enhanced LazyVim
+# Create tmux session with stock LazyVim
 start_session() {
     local project_dir="$1"
     
@@ -363,7 +215,7 @@ start_session() {
         esac
     fi
     
-    log "Creating enhanced stable LazyVim session..."
+    log "Creating tmux session with stock LazyVim..."
     
     # Fix git safe.directory issue for Docker volumes
     if [ -d "$project_dir/.git" ]; then
@@ -371,10 +223,7 @@ start_session() {
         git config --global --add safe.directory "$project_dir" 2>/dev/null || true
     fi
     
-    # Create enhanced LazyVim configuration
-    create_lazyvim_config "$project_dir"
-    
-    # Create session with LazyVim
+    # Create session with stock LazyVim
     tmux new-session -d -s "$SESSION_NAME" -c "$project_dir"
     
     # Load tmux config
@@ -388,12 +237,12 @@ start_session() {
     # Get window reference
     local window=$(tmux list-windows -t "$SESSION_NAME" -F "#{window_index}" | head -n1)
     
-    # Launch LazyVim with enhanced configuration and file explorer
-    log "Launching enhanced LazyVim with file tree..."
+    # Launch stock LazyVim
+    log "Launching LazyVim..."
     tmux send-keys -t "$SESSION_NAME:$window" "cd '$project_dir' && nvim ." C-m
     
-    # Wait for LazyVim to load and plugins to initialize
-    sleep 5
+    # Wait for LazyVim to initialize
+    sleep 2
     
     # Create bottom terminal pane (30% height)
     log "Setting up terminal panes..."
@@ -417,37 +266,26 @@ start_session() {
     # Rename window
     tmux rename-window -t "$SESSION_NAME:$window" "NeoCode"
     
-    log "🎉 Enhanced NeoCode with LazyVim ready!"
+    log "🎉 NeoCode with LazyVim ready!"
     echo ""
-    echo "✨ Key Features:"
-    echo "   📁 File Tree: Always visible on the left (auto-opens)"
-    echo "   🔍 Find Files: Space + ff"
-    echo "   🔎 Find in Files: Space + fg"
-    echo "   📋 Buffers: Space + fb"
-    echo "   ⚡ Commands: Space + fc"
-    echo ""
-    echo "🛡️ Enhanced Stability:"
-    echo "   • Mouse DISABLED in nvim (prevents accidental exits)"
-    echo "   • Right-click paste disabled in tmux"
-    echo "   • Auto-save on focus loss"
-    echo "   • Confirmation before quitting (Ctrl+Q or Space+q)"
-    echo "   • File tree always visible"
+    echo "✨ LazyVim Shortcuts:"
+    echo "   🔍 Find Files:     Space + Space or Space + ff"
+    echo "   🔎 Find in Files:  Space + sg"
+    echo "   � File Explorer:  Space + e"
+    echo "   📋 Buffers:        Space + fb"
     echo ""
     echo "🎯 Navigation:"
-    echo "   Ctrl+h/j/k/l    - Navigate panes (vim + tmux)"
+    echo "   Ctrl+h/j/k/l    - Navigate between tmux panes and nvim windows"
     echo "   Alt+Arrow Keys  - Alternative pane navigation"
-    echo "   Ctrl+a + |      - Split vertically"
-    echo "   Ctrl+a + -      - Split horizontally"
-    echo "   Space + e       - Toggle file tree focus"
+    echo "   Ctrl+a + |      - Split tmux pane vertically"
+    echo "   Ctrl+a + -      - Split tmux pane horizontally"
     if [ -d "$project_dir/.git" ]; then
         echo ""
-        echo "📦 Git Repository Detected:"
-        echo "   • Git status pane available in bottom-right"
-        echo "   • Safe directory configured for Docker volumes"
+        echo "📦 Git Repository:"
+        echo "   • Git status in bottom-right pane"
     fi
     echo ""
-    echo "🚪 Safe Exit: Use Ctrl+Q or Space+q (with confirmation)"
-    echo "💡 Tip: Use keyboard only - mouse is disabled for stability"
+    echo "� Using stock LazyVim - see lazyvim.org for more shortcuts"
     echo ""
     
     # Attach to session
