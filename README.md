@@ -12,12 +12,16 @@ NeoCode combines the power of **LazyVim** (a modern Neovim distribution) with **
 ## ✨ Features
 
 - **🚀 LazyVim**: Modern Neovim distribution with VSCode-like features
-- **📁 File Explorer**: Always-visible file tree (Space + e)
-- **� Fuzzy Finding**: Quick file search (Space + ff)
+- **🪟 Windows-Style Shortcuts**: Familiar Ctrl+S, Ctrl+C, Ctrl+V, and more
+- **📑 Buffer-Based Tabs**: Open files shown as tabs (like VSCode), not Neovim tabs
+- **📁 Unified File Explorer**: One shared file tree, not duplicated per tab
+- **🎯 Smart Navigation**: Seamless movement between tmux panes and Neovim splits
+- **📊 Dashboard as Buffer**: LazyVim menu accessible as a tab, not an overlay
+- **🔍 Fuzzy Finding**: Quick file search (Ctrl+P or Space+ff)
 - **⚡ Modern LSP**: Language servers, autocompletion, diagnostics
-- **� Beautiful UI**: Modern themes and statusline
-- **� Split Panes**: tmux integration for terminal workflow
-- **� Zero Config**: Works perfectly out of the box
+- **🎨 Beautiful UI**: Catppuccin theme with modern statusline and bufferline
+- **📊 Split Panes**: tmux integration for terminal workflow
+- **🔧 Works Out of the Box**: Optimized configuration included
 - **🌟 Extensible**: Easy to add plugins and customizations
 
 ## 🚀 Quick Start
@@ -55,36 +59,81 @@ neocode list
 
 ### Key Bindings
 
-#### General
+**📖 See the complete [Navigation Guide](docs/Navigation-Guide.md) for all shortcuts!**
+
+#### Windows-Style Shortcuts (Familiar!)
+
+- `Ctrl + S` - Save file
+- `Ctrl + W` - Close buffer/tab
+- `Ctrl + C` - Copy (line or selection)
+- `Ctrl + V` - Paste
+- `Ctrl + X` - Cut
+- `Ctrl + Z` - Undo
+- `Ctrl + Y` - Redo
+- `Ctrl + F` - Find in file
+- `Ctrl + H` - Find and replace
+- `Ctrl + P` - Quick open file
+- `Ctrl + Shift + F` - Find in all files
+- `Ctrl + B` - Toggle file explorer
+- `Ctrl + Tab` - Next buffer/tab
+- `Ctrl + /` - Toggle comment
+
+#### File Operations (LazyVim Style)
+
 - `<Space>` - Leader key
-- `<C-h/j/k/l>` - Navigate between panes
-- `<C-\>` - Toggle terminal
-- `<leader>w` - Save file
-- `<leader>q` - Quit
+- `<Space> + ff` - Find files (Telescope)
+- `<Space> + fg` - Live grep (search in files)
+- `<Space> + fb` - Browse buffers
+- `<Space> + e` - Toggle file explorer
+- `<Space> + ud` - Open dashboard (as a tab)
 
-#### File Operations
-- `<leader>ff` - Find files
-- `<leader>fg` - Live grep
-- `<leader>fb` - Browse buffers
-- `<leader>e` - Toggle file explorer
+#### Navigation
 
-#### Editor
-- `<S-h/l>` - Navigate buffers
-- `<leader>bd` - Delete buffer
-- `<A-j/k>` - Move lines up/down
+- `Ctrl + H/J/K/L` - Navigate between tmux panes AND Neovim splits
+- `Alt + Arrow Keys` - Alternative pane navigation
+- `F12` - Go to definition (LSP)
+- `Ctrl + F12` - Go to implementation
+- `Shift + F12` - Find references
 
-#### NeoCode Specific
-- `<leader>nc` - Open NeoCode config
-- `<leader>nr` - Reload configuration
-- `<leader>nt` - Toggle theme
+#### tmux Window Management
+
+- `Ctrl + A` then `|` - Split vertically
+- `Ctrl + A` then `-` - Split horizontally  
+- `Ctrl + A` then `Z` - Zoom current pane
+- `Ctrl + Left/Right` - Switch tmux windows
+- `Ctrl + Shift + Left/Right/Up/Down` - Resize panes
 
 ### Session Management
 
-NeoCode creates organized tmux sessions with predefined layouts:
+NeoCode creates organized tmux sessions with an optimized layout:
 
-- **Window 1 (Editor)**: Main Neovim instance
-- **Window 2 (Terminal)**: Command line interface
-- **Window 3 (Git)**: Git operations and status
+#### Architecture
+
+```
+┌────────────────────────────────────────────────────────┐
+│ tmux Window 1: "NeoCode" (Main Workspace)             │
+│ ┌──────────┬───────────────────────────────────────┐  │
+│ │          │ Bufferline (VSCode-like file tabs)    │  │
+│ │  Neo-    │ ┌──────────────────────────────────┐  │  │
+│ │  Tree    │ │                                  │  │  │
+│ │          │ │   Editor Area (Current Buffer)   │  │  │
+│ │  File    │ │                                  │  │  │
+│ │  Explorer│ └──────────────────────────────────┘  │  │
+│ │          ├──────────────────┬──────────────────┤  │
+│ │  (Shared)│   Terminal Pane   │    Git Pane     │  │
+│ └──────────┴──────────────────┴──────────────────┘  │
+│                                                        │
+│ tmux Window 2+: Additional workspaces as needed       │
+└────────────────────────────────────────────────────────┘
+```
+
+#### Key Concepts
+
+- **tmux Windows** = Separate workspaces (shown in bottom status bar)
+- **Neovim Buffers** = Open files (shown in top bufferline as "tabs")
+- **One File Tree** = Shared file explorer in left pane
+- **No Neovim Tabs** = We use buffers instead for VSCode-like experience
+- **Dashboard as Buffer** = LazyVim menu opens as a tab, not an overlay
 
 ## ⚙️ Configuration
 
@@ -254,16 +303,41 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [Catppuccin](https://github.com/catppuccin/nvim) - Soothing pastel theme
 - [lazy.nvim](https://github.com/folke/lazy.nvim) - Plugin manager
 
-## 📊 Roadmap
+## � Documentation
+
+NeoCode comes with comprehensive documentation:
+
+- **[Navigation Guide](docs/Navigation-Guide.md)** - Complete keyboard shortcuts reference (Windows + Vim)
+- **[Quick Reference](docs/Quick-Reference.md)** - Printable cheat sheet with top shortcuts
+- **[LazyVim Setup Guide](docs/LazyVim-Setup-Guide.md)** - Installation and configuration instructions
+- **[Visual Architecture](docs/Visual-Architecture.md)** - Diagrams and visual workflow guides
+- **[Implementation Summary](docs/Implementation-Summary.md)** - Technical details and design decisions
+- **[VSCode Setup Guide](docs/VSCode-Setup-Guide.md)** - Using NeoCode from VSCode
+
+### Quick Links
+
+| I want to... | Read this... |
+|--------------|--------------|
+| Learn all shortcuts | [Navigation Guide](docs/Navigation-Guide.md) |
+| Get started quickly | [Quick Reference](docs/Quick-Reference.md) |
+| Install NeoCode | [LazyVim Setup Guide](docs/LazyVim-Setup-Guide.md) |
+| Understand architecture | [Visual Architecture](docs/Visual-Architecture.md) |
+| Customize NeoCode | [Implementation Summary](docs/Implementation-Summary.md) |
+
+## �📊 Roadmap
 
 - [x] Core editor functionality
 - [x] tmux integration
 - [x] LSP support
 - [x] Plugin system
+- [x] Windows-style keyboard shortcuts
+- [x] VSCode-like buffer/tab system
+- [x] Comprehensive documentation
 - [ ] Desktop GUI version
 - [ ] Remote development server
 - [ ] Collaborative editing
 - [ ] Extension marketplace
+- [ ] Video tutorials
 
 ---
 
