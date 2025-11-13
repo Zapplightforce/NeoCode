@@ -1,6 +1,5 @@
 #!/bin/bash
-# NeoCode Session Manager
-# Creates and manages NeoCode editing sessions
+# NeoCode with LazyVim - VSCode-like Session Manager
 
 set -e
 
@@ -15,7 +14,6 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# Logging function
 log() {
     echo -e "${GREEN}[NeoCode]${NC} $1"
 }
@@ -28,98 +26,435 @@ warning() {
     echo -e "${YELLOW}[WARNING]${NC} $1"
 }
 
+# Check if LazyVim is available
+check_lazyvim() {
+    if [ ! -d "$HOME/.config/nvim" ]; then
+        error "LazyVim not found! Please install LazyVim first:"
+        echo ""
+        echo "  git clone https://github.com/LazyVim/starter ~/.config/nvim"
+        echo "  rm -rf ~/.config/nvim/.git"
+        echo ""
+        exit 1
+    fi
+    
+    # Check Neovim version
+    local nvim_version=$(nvim --version | head -n1 | grep -o 'v[0-9]\+\.[0-9]\+' | cut -c2-)
+    if [ "$(printf '%s\n' "0.8.0" "$nvim_version" | sort -V | head -n1)" = "0.8.0" ]; then
+        log "✅ Neovim $nvim_version (compatible with LazyVim)"
+    else
+        warning "⚠️  Neovim $nvim_version may not be fully compatible with LazyVim"
+    fi
+}
+
 # Check dependencies
 check_dependencies() {
     log "Checking dependencies..."
     
     local missing_deps=()
     
-    if ! command -v tmux &> /dev/null; then
-        missing_deps+=("tmux")
-    fi
-    
-    if ! command -v nvim &> /dev/null; then
-        missing_deps+=("neovim")
-    fi
+    command -v tmux &> /dev/null || missing_deps+=("tmux")
+    command -v nvim &> /dev/null || missing_deps+=("neovim")
+    command -v git &> /dev/null || missing_deps+=("git")
     
     if [ ${#missing_deps[@]} -ne 0 ]; then
         error "Missing dependencies: ${missing_deps[*]}"
-        echo "Please install the missing dependencies and try again."
         exit 1
     fi
     
+    check_lazyvim
     log "All dependencies found ✓"
 }
 
-# Setup NeoCode configuration
+# Setup enhanced tmux configuration
 setup_config() {
-    log "Setting up NeoCode configuration..."
+    log "Setting up enhanced tmux configuration..."
     
-    # Create config directories
     mkdir -p "$HOME/.config/neocode"
-    mkdir -p "$HOME/.local/share/neocode"
     
-    # Copy configuration files
     if [ -f "$CONFIG_DIR/tmux.conf" ]; then
         cp "$CONFIG_DIR/tmux.conf" "$HOME/.config/neocode/tmux.conf"
-        log "Copied tmux configuration"
-    fi
-    
-    # Create symlink for Neovim config
-    if [ ! -L "$HOME/.config/neocode/init.lua" ]; then
-        ln -sf "$NEOCODE_DIR/init.lua" "$HOME/.config/neocode/init.lua"
-        log "Created Neovim configuration symlink"
-    fi
-    
-    # Create lua directory symlink
-    if [ ! -L "$HOME/.config/neocode/lua" ]; then
-        ln -sf "$NEOCODE_DIR/lua" "$HOME/.config/neocode/lua"
-        log "Created lua directory symlink"
+        log "✅ Tmux configuration ready"
     fi
 }
 
-# Start NeoCode session
-start_session() {
-    local project_dir="${1:-$(pwd)}"
+# Enhanced directory selection with user prompts
+# Returns the selected directory path via a global variable to avoid stdout pollution
+select_project_directory() {
+    local current_dir="$(pwd)"
+    SELECTED_DIR=""
     
-    log "Starting NeoCode session in: $project_dir"
+    while true; do
+        echo "" >&2
+        echo "🚀 Welcome to NeoCode with LazyVim!" >&2
+        echo "" >&2
+        echo "📁 Current directory: $(basename "$current_dir")" >&2
+        echo "   Full path: $current_dir" >&2
+        echo "" >&2
+        echo "Choose an option:" >&2
+        echo "  [1] Open current directory" >&2
+        echo "  [2] Choose different directory" >&2
+        echo "  [3] Cancel" >&2
+        echo "" >&2
+        
+        read -r -p "Enter your choice [1-3]: " choice
+        
+        case $choice in
+            1|y|Y)
+                echo "" >&2
+                echo "✅ Using current directory: $current_dir" >&2
+                SELECTED_DIR="$current_dir"
+                return 0
+                ;;
+            2|d|D)
+                while true; do
+                    echo "" >&2
+                    read -r -p "📂 Enter directory path: " custom_dir
+                    
+                    # Handle empty input
+                    if [ -z "$custom_dir" ]; then
+                        echo "" >&2
+                        echo "❌ No path entered." >&2
+                        read -r -s -p "Press Enter to go back to menu..."
+                        echo "" >&2
+                        break  # Go back to main menu
+                    fi
+                    
+                    # Expand tilde and resolve path
+                    custom_dir="${custom_dir/#\~/$HOME}"
+                    
+                    # Check if directory exists
+                    if [ -d "$custom_dir" ]; then
+                        # Convert to absolute path
+                        local abs_dir
+                        abs_dir=$(cd "$custom_dir" && pwd) || abs_dir="$custom_dir"
+                        echo "" >&2
+                        echo "✅ Using directory: $abs_dir" >&2
+                        SELECTED_DIR="$abs_dir"
+                        return 0
+                    else
+                        echo "" >&2
+                        echo "❌ Directory does not exist: $custom_dir" >&2
+                        read -r -p "Try again? [y/n]: " retry
+                        if [[ ! "$retry" =~ ^[yY]$ ]]; then
+                            echo "" >&2
+                            break  # Go back to main menu
+                        fi
+                    fi
+                done
+                ;;
+            3|n|N|q|Q)
+                echo "" >&2
+                echo "❌ Cancelled by user." >&2
+                return 1
+                ;;
+            *)
+                echo "" >&2
+                echo "❌ Invalid choice. Please enter 1, 2, or 3." >&2
+                read -r -s -p "Press Enter to continue..."
+                echo "" >&2
+                ;;
+        esac
+    done
+}
+# Create enhanced LazyVim configuration for stability and file tree
+create_lazyvim_config() {
+    local project_dir="$1"
     
-    # Check if session already exists
-    if tmux has-session -t "$SESSION_NAME" 2>/dev/null; then
-        warning "Session '$SESSION_NAME' already exists"
-        echo "Attaching to existing session..."
-        tmux attach-session -t "$SESSION_NAME"
-        return
+    log "Creating stable LazyVim configuration..."
+    
+    # Create NeoCode-specific LazyVim config
+    mkdir -p "$HOME/.config/nvim/lua/config"
+    mkdir -p "$HOME/.config/nvim/lua/plugins"
+    
+    # Enhanced init.lua with file tree auto-open and stability
+    cat > "$HOME/.config/nvim/lua/config/neocode.lua" << 'EOF'
+-- NeoCode LazyVim Configuration
+-- Enhanced stability and VSCode-like behavior
+
+-- CRITICAL: Disable mouse to prevent accidental exits and instability
+vim.opt.mouse = ""  -- Completely disable mouse in nvim
+
+-- Enhanced stability settings (set early)
+vim.opt.backup = false          -- Don't create backup files
+vim.opt.writebackup = false     -- Don't create backup before overwriting
+vim.opt.swapfile = false        -- Don't create swap files
+vim.opt.autowrite = true        -- Auto-save on buffer switch
+vim.opt.confirm = true          -- Confirm before discarding changes
+
+-- Better error handling
+vim.opt.errorbells = false
+vim.opt.visualbell = true
+
+-- Disable clipboard integration to prevent instability
+vim.opt.clipboard = ""
+
+-- Enhanced exit confirmation to prevent accidental exits
+local function confirm_quit()
+  local choice = vim.fn.confirm("Do you want to quit NeoCode?", "&Yes\n&No", 2)
+  if choice == 1 then
+    vim.cmd("qa!")
+  end
+end
+
+-- Override default quit commands with confirmation
+vim.keymap.set('n', '<leader>q', confirm_quit, { desc = "Quit with confirmation" })
+vim.keymap.set('n', '<leader>Q', confirm_quit, { desc = "Quit with confirmation" })
+vim.keymap.set('n', 'ZQ', confirm_quit, { desc = "Quit with confirmation" })
+vim.keymap.set('n', 'ZZ', confirm_quit, { desc = "Quit with confirmation" })
+
+-- Map Ctrl+Q for safer quit
+vim.keymap.set('n', '<C-q>', confirm_quit, { desc = "Quit NeoCode safely" })
+vim.keymap.set('i', '<C-q>', '<Esc>' .. confirm_quit, { desc = "Quit NeoCode safely" })
+
+-- Auto-save on focus lost (prevents data loss)
+vim.api.nvim_create_autocmd("FocusLost", {
+  callback = function()
+    vim.cmd("silent! wa")  -- Save all buffers
+  end,
+})
+
+-- Prevent accidental closing of the last buffer
+vim.api.nvim_create_autocmd("BufDelete", {
+  callback = function()
+    local buffers = vim.fn.getbufinfo({buflisted = 1})
+    if #buffers == 1 then
+      -- If this is the last buffer, create a new empty one
+      vim.cmd("enew")
+    end
+  end,
+})
+
+EOF
+    
+    # Create neo-tree plugin override for VSCode-like behavior
+    cat > "$HOME/.config/nvim/lua/plugins/neo-tree.lua" << 'EOF'
+-- Neo-tree configuration for VSCode-like file explorer
+return {
+  "nvim-neo-tree/neo-tree.nvim",
+  opts = {
+    close_if_last_window = false, -- Don't close neo-tree if it's the last window
+    enable_git_status = true,
+    enable_diagnostics = true,
+    filesystem = {
+      follow_current_file = {
+        enabled = true, -- Focus on current file in tree
+      },
+      hijack_netrw_behavior = "open_current", -- Use neo-tree instead of netrw
+    },
+    window = {
+      position = "left",
+      width = 35,
+      mappings = {
+        -- Disable closing on quit
+        ["<esc>"] = "noop",
+      },
+    },
+    default_component_configs = {
+      indent = {
+        with_expanders = true,
+        expander_collapsed = "",
+        expander_expanded = "",
+      },
+    },
+  },
+  init = function()
+    -- Auto-open neo-tree on VimEnter
+    vim.api.nvim_create_autocmd("VimEnter", {
+      callback = function()
+        -- Delay to ensure LazyVim is fully loaded
+        vim.defer_fn(function()
+          if vim.fn.argc() == 0 or (vim.fn.argc() == 1 and vim.fn.isdirectory(vim.fn.argv(0)) == 1) then
+            require("neo-tree.command").execute({ action = "show", reveal = true })
+            -- Focus back on main window
+            vim.cmd("wincmd l")
+          end
+        end, 100)
+      end,
+    })
+    
+    -- Keep neo-tree visible
+    vim.api.nvim_create_autocmd("BufEnter", {
+      callback = function()
+        -- Check if neo-tree is open
+        if vim.bo.buftype == "" and vim.bo.filetype ~= "neo-tree" then
+          local neo_tree_open = false
+          for _, win in ipairs(vim.api.nvim_list_wins()) do
+            local buf = vim.api.nvim_win_get_buf(win)
+            if vim.bo[buf].filetype == "neo-tree" then
+              neo_tree_open = true
+              break
+            end
+          end
+          if not neo_tree_open then
+            require("neo-tree.command").execute({ action = "show" })
+            vim.cmd("wincmd l")
+          end
+        end
+      end,
+    })
+  end,
+}
+EOF
+    
+    # Add our config to LazyVim's init
+    if ! grep -q "require.*config.*neocode" "$HOME/.config/nvim/init.lua" 2>/dev/null; then
+        echo "-- NeoCode configuration" >> "$HOME/.config/nvim/init.lua"
+        echo "require('config.neocode')" >> "$HOME/.config/nvim/init.lua"
     fi
     
-    # Create new session
+    log "✅ Stable LazyVim configuration created"
+}
+
+# Create VSCode-like session with enhanced LazyVim
+start_session() {
+    local project_dir="$1"
+    
+    # If no directory specified, let user choose
+    if [ -z "$project_dir" ]; then
+        select_project_directory
+        local exit_code=$?
+        if [ $exit_code -ne 0 ] || [ -z "$SELECTED_DIR" ]; then
+            echo ""
+            echo "Startup cancelled."
+            return 1
+        fi
+        project_dir="$SELECTED_DIR"
+    else
+        # If directory was passed as argument, validate and convert to absolute path
+        if [ ! -d "$project_dir" ]; then
+            error "Directory does not exist: $project_dir"
+            return 1
+        fi
+        # Convert to absolute path using cd
+        project_dir=$(cd "$project_dir" && pwd) || {
+            error "Failed to resolve directory: $project_dir"
+            return 1
+        }
+    fi
+    
+    log "Starting NeoCode with LazyVim in: $project_dir"
+    
+    # Check if session exists
+    if tmux has-session -t "$SESSION_NAME" 2>/dev/null; then
+        warning "Session '$SESSION_NAME' already exists"
+        echo ""
+        echo "Choose an option:"
+        echo "  [a] Attach to existing session"
+        echo "  [k] Kill existing session and create new one"
+        echo "  [c] Cancel"
+        echo ""
+        read -p "Enter your choice [a/k/c]: " existing_choice
+        echo ""
+        
+        case $existing_choice in
+            a|A)
+                log "Attaching to existing session..."
+                tmux attach-session -t "$SESSION_NAME"
+                return
+                ;;
+            k|K)
+                tmux kill-session -t "$SESSION_NAME"
+                log "Killed existing session"
+                ;;
+            c|C|*)
+                echo "Cancelled."
+                return 1
+                ;;
+        esac
+    fi
+    
+    log "Creating enhanced stable LazyVim session..."
+    
+    # Fix git safe.directory issue for Docker volumes
+    if [ -d "$project_dir/.git" ]; then
+        log "Configuring git safe.directory..."
+        git config --global --add safe.directory "$project_dir" 2>/dev/null || true
+    fi
+    
+    # Create enhanced LazyVim configuration
+    create_lazyvim_config "$project_dir"
+    
+    # Create session with LazyVim
     tmux new-session -d -s "$SESSION_NAME" -c "$project_dir"
     
-    # Load tmux configuration
-    tmux source-file "$HOME/.config/neocode/tmux.conf"
+    # Load tmux config
+    if [ -f "$HOME/.config/neocode/tmux.conf" ]; then
+        tmux source-file "$HOME/.config/neocode/tmux.conf" 2>/dev/null || true
+    fi
     
-    # Setup initial layout
-    # Window 1: Main editor
-    tmux rename-window -t "$SESSION_NAME:1" "Editor"
-    tmux send-keys -t "$SESSION_NAME:1" "nvim -u ~/.config/neocode/init.lua ." C-m
+    # Wait for session to be ready
+    sleep 1
     
-    # Window 2: Terminal
-    tmux new-window -t "$SESSION_NAME" -n "Terminal" -c "$project_dir"
+    # Get window reference
+    local window=$(tmux list-windows -t "$SESSION_NAME" -F "#{window_index}" | head -n1)
     
-    # Window 3: Git/Tools
-    tmux new-window -t "$SESSION_NAME" -n "Git" -c "$project_dir"
-    tmux send-keys -t "$SESSION_NAME:3" "git status" C-m
+    # Launch LazyVim with enhanced configuration and file explorer
+    log "Launching enhanced LazyVim with file tree..."
+    tmux send-keys -t "$SESSION_NAME:$window" "cd '$project_dir' && nvim ." C-m
     
-    # Focus on editor window
-    tmux select-window -t "$SESSION_NAME:1"
+    # Wait for LazyVim to load and plugins to initialize
+    sleep 5
     
-    log "NeoCode session created successfully!"
+    # Create bottom terminal pane (30% height)
+    log "Setting up terminal panes..."
+    tmux split-window -t "$SESSION_NAME:$window" -v -p 30 -c "$project_dir"
+    
+    # If git repo, create git pane
+    if [ -d "$project_dir/.git" ]; then
+        tmux split-window -h -p 50 -c "$project_dir"
+        tmux send-keys "git status" C-m
+        tmux select-pane -T "Git"
+        tmux select-pane -L
+        tmux select-pane -T "Terminal"
+    else
+        tmux select-pane -T "Terminal"
+    fi
+    
+    # Focus back on LazyVim
+    tmux select-pane -U
+    tmux select-pane -T "LazyVim"
+    
+    # Rename window
+    tmux rename-window -t "$SESSION_NAME:$window" "NeoCode"
+    
+    log "🎉 Enhanced NeoCode with LazyVim ready!"
+    echo ""
+    echo "✨ Key Features:"
+    echo "   📁 File Tree: Always visible on the left (auto-opens)"
+    echo "   🔍 Find Files: Space + ff"
+    echo "   🔎 Find in Files: Space + fg"
+    echo "   📋 Buffers: Space + fb"
+    echo "   ⚡ Commands: Space + fc"
+    echo ""
+    echo "🛡️ Enhanced Stability:"
+    echo "   • Mouse DISABLED in nvim (prevents accidental exits)"
+    echo "   • Right-click paste disabled in tmux"
+    echo "   • Auto-save on focus loss"
+    echo "   • Confirmation before quitting (Ctrl+Q or Space+q)"
+    echo "   • File tree always visible"
+    echo ""
+    echo "🎯 Navigation:"
+    echo "   Ctrl+h/j/k/l    - Navigate panes (vim + tmux)"
+    echo "   Alt+Arrow Keys  - Alternative pane navigation"
+    echo "   Ctrl+a + |      - Split vertically"
+    echo "   Ctrl+a + -      - Split horizontally"
+    echo "   Space + e       - Toggle file tree focus"
+    if [ -d "$project_dir/.git" ]; then
+        echo ""
+        echo "📦 Git Repository Detected:"
+        echo "   • Git status pane available in bottom-right"
+        echo "   • Safe directory configured for Docker volumes"
+    fi
+    echo ""
+    echo "🚪 Safe Exit: Use Ctrl+Q or Space+q (with confirmation)"
+    echo "💡 Tip: Use keyboard only - mouse is disabled for stability"
+    echo ""
     
     # Attach to session
     tmux attach-session -t "$SESSION_NAME"
 }
 
-# Stop NeoCode session
+# Stop session
 stop_session() {
     if tmux has-session -t "$SESSION_NAME" 2>/dev/null; then
         tmux kill-session -t "$SESSION_NAME"
@@ -129,7 +464,7 @@ stop_session() {
     fi
 }
 
-# List active sessions
+# List sessions
 list_sessions() {
     log "Active tmux sessions:"
     tmux list-sessions 2>/dev/null || echo "No active sessions"
@@ -138,31 +473,40 @@ list_sessions() {
 # Show help
 show_help() {
     cat << EOF
-NeoCode Session Manager
+🚀 NeoCode with LazyVim - Modern VSCode-like Terminal Editor
 
 Usage: $0 [COMMAND] [OPTIONS]
 
 Commands:
-    start [DIR]     Start a new NeoCode session (default: current directory)
+    start [DIR]     Start NeoCode with LazyVim (default: current directory)
     stop           Stop the current NeoCode session
-    attach         Attach to existing NeoCode session
+    attach         Attach to existing NeoCode session  
     list           List all active tmux sessions
     setup          Setup NeoCode configuration
     check          Check system dependencies
     help           Show this help message
 
+LazyVim Features:
+    📁 File Explorer      <leader>e (Space + e)
+    🔍 Find Files         <leader>ff (Space + f + f)
+    🔎 Live Grep          <leader>fg (Space + f + g) 
+    📋 Buffers           <leader>fb (Space + f + b)
+    ⚡ Commands          <leader>fc (Space + f + c)
+    🎨 Colorschemes      <leader>uC (Space + u + C)
+    
 Examples:
-    $0 start /path/to/project    # Start session in specific directory
-    $0 start                     # Start session in current directory
-    $0 stop                      # Stop current session
-    $0 attach                    # Attach to existing session
+    $0 start                    # Start in current directory
+    $0 start /path/to/project   # Start in specific directory
+    $0 stop                     # Stop current session
+
+For more LazyVim help, press '?' in LazyVim or visit: https://lazyvim.org
 
 EOF
 }
 
 # Main execution
 main() {
-    case "${1:-help}" in
+    case "${1:-start}" in
         "start")
             check_dependencies
             setup_config
@@ -194,9 +538,16 @@ main() {
             show_help
             ;;
         *)
-            error "Unknown command: $1"
-            show_help
-            exit 1
+            # If an unknown argument is passed, treat it as a directory for start
+            if [ -d "$1" ]; then
+                check_dependencies
+                setup_config
+                start_session "$1"
+            else
+                error "Unknown command: $1"
+                show_help
+                exit 1
+            fi
             ;;
     esac
 }

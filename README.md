@@ -1,56 +1,39 @@
-# NeoCode - Terminal-Based Code Editor
+# NeoCode - LazyVim Edition
 
 <div align="center">
-  <h3>🚀 A highly optimized terminal-based code editor combining Neovim + tmux</h3>
-  <p>Bringing VSCode-like UX to headless server environments</p>
+  <h3>🚀 A VSCode-like terminal development environment using LazyVim + tmux</h3>
+  <p>Modern, proven Neovim distribution with zero configuration hassle</p>
 </div>
 
 ## 🎯 Overview
 
-NeoCode is a powerful, customizable code editor designed for developers who need a VSCode-like experience in terminal-only environments. It combines the extensibility of Neovim with the session management capabilities of tmux to create a seamless coding experience optimized for remote development, servers, and headless systems.
+NeoCode combines the power of **LazyVim** (a modern Neovim distribution) with **tmux** to create a VSCode-like development experience in the terminal. Instead of building custom configurations from scratch, we leverage the mature, battle-tested LazyVim ecosystem for reliability and modern features.
 
 ## ✨ Features
 
-- **🎨 Modern UI**: VSCode-inspired interface with status lines, file explorer, and command palette
-- **⚡ Performance**: Optimized for speed and minimal resource usage
-- **🔧 Extensible**: Modular plugin architecture with Lua configuration
-- **🖥️ Session Management**: Persistent sessions with tmux integration
-- **🌐 LSP Support**: Full Language Server Protocol support for intelligent code completion
-- **🎭 Themes**: Beautiful color schemes including Catppuccin
-- **🔍 Fuzzy Finding**: Telescope integration for file and text searching
-- **📁 File Explorer**: Integrated file tree with Git status indicators
-- **⌨️ Keyboard-First**: Vim-style navigation and shortcuts
-- **🔄 Git Integration**: Built-in Git status and operations
+- **🚀 LazyVim**: Modern Neovim distribution with VSCode-like features
+- **📁 File Explorer**: Always-visible file tree (Space + e)
+- **� Fuzzy Finding**: Quick file search (Space + ff)
+- **⚡ Modern LSP**: Language servers, autocompletion, diagnostics
+- **� Beautiful UI**: Modern themes and statusline
+- **� Split Panes**: tmux integration for terminal workflow
+- **� Zero Config**: Works perfectly out of the box
+- **🌟 Extensible**: Easy to add plugins and customizations
 
 ## 🚀 Quick Start
 
-### Prerequisites
+### Docker (Recommended)
 
-- Linux, macOS, or Windows with WSL
-- Neovim >= 0.8.0
-- tmux >= 3.0
-- Git
-- Node.js (for language servers)
+```bash
+# Build the container
+docker build -t neocode .
 
-### Installation
+# Run NeoCode
+docker run -it --rm -v ${PWD}:/workspace neocode
 
-1. **Automatic Installation** (Recommended):
-   ```bash
-   curl -fsSL https://raw.githubusercontent.com/your-username/neocode/main/scripts/install.sh | bash
-   ```
-
-2. **Manual Installation**:
-   ```bash
-   git clone https://github.com/your-username/neocode.git ~/.neocode
-   cd ~/.neocode
-   chmod +x scripts/install.sh scripts/neocode
-   ./scripts/install.sh
-   ```
-
-3. **Start Your First Session**:
-   ```bash
-   neocode start
-   ```
+# Inside container, start NeoCode
+neocode start
+```
 
 ## 📖 Usage
 

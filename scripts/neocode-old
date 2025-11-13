@@ -1,0 +1,289 @@
+#!/bin/bash
+# NeoCode Session Manager
+# Creates and manages NeoCode editing sessions
+
+set -e
+
+NEOCODE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+CONFIG_DIR="$NEOCODE_DIR/config"
+SESSION_NAME="neocode"
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Logging function
+log() {
+    echo -e "${GREEN}[NeoCode]${NC} $1"
+}
+
+error() {
+    echo -e "${RED}[ERROR]${NC} $1" >&2
+}
+
+warning() {
+    echo -e "${YELLOW}[WARNING]${NC} $1"
+}
+
+# Check dependencies
+check_dependencies() {
+    log "Checking dependencies..."
+    
+    local missing_deps=()
+    
+    if ! command -v tmux &> /dev/null; then
+        missing_deps+=("tmux")
+    fi
+    
+    if ! command -v nvim &> /dev/null; then
+        missing_deps+=("neovim")
+    fi
+    
+    if [ ${#missing_deps[@]} -ne 0 ]; then
+        error "Missing dependencies: ${missing_deps[*]}"
+        echo "Please install the missing dependencies and try again."
+        exit 1
+    fi
+    
+    log "All dependencies found ✓"
+}
+
+# Setup NeoCode configuration
+setup_config() {
+    log "Setting up NeoCode configuration..."
+    
+    # Create config directories
+    mkdir -p "$HOME/.config/neocode"
+    mkdir -p "$HOME/.local/share/neocode"
+    
+    # Copy configuration files
+    if [ -f "$CONFIG_DIR/tmux.conf" ]; then
+        cp "$CONFIG_DIR/tmux.conf" "$HOME/.config/neocode/tmux.conf"
+        log "Copied tmux configuration"
+    fi
+    
+    # Create or update Neovim config symlink
+    rm -f "$HOME/.config/neocode/init.lua"
+    ln -sf "$NEOCODE_DIR/init.lua" "$HOME/.config/neocode/init.lua"
+    log "Created Neovim configuration symlink"
+    
+    # Create or update lua directory symlink
+    rm -rf "$HOME/.config/neocode/lua"
+    ln -sf "$NEOCODE_DIR/lua" "$HOME/.config/neocode/lua"
+    log "Created lua directory symlink"
+    
+    # Verify symlinks
+    log "Verifying configuration..."
+    if [ -f "$HOME/.config/neocode/init.lua" ]; then
+        log "✓ init.lua symlink verified"
+    else
+        warning "✗ init.lua symlink failed"
+    fi
+    
+    if [ -d "$HOME/.config/neocode/lua" ]; then
+        log "✓ lua directory symlink verified"
+    else
+        warning "✗ lua directory symlink failed"
+    fi
+    
+    # Also copy files as fallback (in case symlinks don't work in Docker)
+    if [ ! -d "$HOME/.config/neocode/lua" ]; then
+        log "Symlink failed, copying lua files..."
+        cp -r "$NEOCODE_DIR/lua" "$HOME/.config/neocode/"
+        log "Copied lua directory as fallback"
+    fi
+}
+
+# Start NeoCode session
+start_session() {
+    local project_dir="${1:-$(pwd)}"
+    
+    # Ask user confirmation if no directory specified
+    if [ "$#" -eq 0 ]; then
+        echo ""
+        echo "📁 Current directory: $(basename "$project_dir")"
+        echo "   Full path: $project_dir"
+        echo ""
+        read -p "🚀 Open this directory as your NeoCode project? (y/n): " -n 1 -r
+        echo ""
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            echo "Cancelled. Use 'neocode start /path/to/project' to specify a different directory."
+            return 1
+        fi
+    fi
+    
+    log "Starting NeoCode session in: $project_dir"
+    
+    # Check if session already exists
+    if tmux has-session -t "$SESSION_NAME" 2>/dev/null; then
+        warning "Session '$SESSION_NAME' already exists"
+        echo "Attaching to existing session..."
+        tmux attach-session -t "$SESSION_NAME"
+        return
+    fi
+    
+    # Simple, reliable session creation
+    log "Creating tmux session '$SESSION_NAME'..."
+    tmux new-session -d -s "$SESSION_NAME" -c "$project_dir"
+    
+    log "Session created. Loading configuration..."
+    tmux source-file "$HOME/.config/neocode/tmux.conf" 2>/dev/null || warning "Could not load tmux config"
+    
+    # Wait for configuration to take effect
+    sleep 1
+    
+    log "Current session info:"
+    tmux list-sessions | grep "$SESSION_NAME" || true
+    tmux list-windows -t "$SESSION_NAME" || true
+    
+    # Get the first available window (should be 1 after config loads)
+    local first_window=$(tmux list-windows -t "$SESSION_NAME" -F "#{window_index}" | head -n1)
+    log "Using window: $first_window"
+    
+    # Rename the window
+    tmux rename-window -t "$SESSION_NAME:$first_window" "Editor"
+    
+    # Rename the main window
+    tmux rename-window -t "$SESSION_NAME:$first_window" "NeoCode"
+    
+    # Create split-pane layout
+    log "Setting up split-pane layout..."
+    
+    # Start Neovim in the main pane (this will show file tree + editor)
+    tmux send-keys -t "$SESSION_NAME:$first_window" "clear" C-m
+    sleep 1
+    tmux send-keys -t "$SESSION_NAME:$first_window" "nvim -u ~/.config/neocode/init.lua ." C-m
+    
+    # Wait for Neovim to start
+    sleep 2
+    
+    # Split horizontally to create bottom terminal pane (30% height)
+    tmux split-window -t "$SESSION_NAME:$first_window" -v -p 30 -c "$project_dir"
+    log "Created bottom terminal pane"
+    
+    # If git repo exists, split the bottom pane vertically for git
+    if [ -d "$project_dir/.git" ]; then
+        # Split the bottom pane (current active pane) vertically
+        tmux split-window -h -p 50 -c "$project_dir"
+        # Send git status to the newly created pane
+        tmux send-keys "git status" C-m
+        log "Created git pane"
+        
+        # Set titles using relative pane selection
+        tmux select-pane -L  # Move to left pane (terminal)
+        tmux select-pane -T "Terminal"
+        tmux select-pane -R  # Move back to git pane
+        tmux select-pane -T "Git"
+    else
+        # Set title for single terminal pane
+        tmux select-pane -T "Terminal"
+    fi
+    
+    # Focus back on the Neovim pane (top pane)
+    tmux select-pane -U  # Move up to the editor pane
+    tmux select-pane -T "Editor"
+    
+    log "NeoCode session created successfully!"
+    echo ""
+    echo "🎉 Welcome to NeoCode!"
+    echo "📁 Project: $(basename "$project_dir")"
+    echo ""
+    echo "⌨️  Navigation:"
+    echo "   Alt+Arrow Keys    - Switch between panes"
+    echo "   Ctrl+a + |        - Split pane vertically"  
+    echo "   Ctrl+a + -        - Split pane horizontally"
+    echo "   Ctrl+a + Space    - Cycle through layouts"
+    echo ""
+    echo "📖 Use ':q' in Neovim to quit, 'neocode stop' to end session"
+    echo ""
+    
+    # Attach to session
+    tmux attach-session -t "$SESSION_NAME"
+}
+
+# Stop NeoCode session
+stop_session() {
+    if tmux has-session -t "$SESSION_NAME" 2>/dev/null; then
+        tmux kill-session -t "$SESSION_NAME"
+        log "NeoCode session stopped"
+    else
+        warning "No active NeoCode session found"
+    fi
+}
+
+# List active sessions
+list_sessions() {
+    log "Active tmux sessions:"
+    tmux list-sessions 2>/dev/null || echo "No active sessions"
+}
+
+# Show help
+show_help() {
+    cat << EOF
+NeoCode Session Manager
+
+Usage: $0 [COMMAND] [OPTIONS]
+
+Commands:
+    start [DIR]     Start a new NeoCode session (default: current directory)
+    stop           Stop the current NeoCode session
+    attach         Attach to existing NeoCode session
+    list           List all active tmux sessions
+    setup          Setup NeoCode configuration
+    check          Check system dependencies
+    help           Show this help message
+
+Examples:
+    $0 start /path/to/project    # Start session in specific directory
+    $0 start                     # Start session in current directory
+    $0 stop                      # Stop current session
+    $0 attach                    # Attach to existing session
+
+EOF
+}
+
+# Main execution
+main() {
+    case "${1:-help}" in
+        "start")
+            check_dependencies
+            setup_config
+            start_session "$2"
+            ;;
+        "stop")
+            stop_session
+            ;;
+        "attach")
+            if tmux has-session -t "$SESSION_NAME" 2>/dev/null; then
+                tmux attach-session -t "$SESSION_NAME"
+            else
+                error "No active NeoCode session found. Use '$0 start' to create one."
+                exit 1
+            fi
+            ;;
+        "list")
+            list_sessions
+            ;;
+        "setup")
+            check_dependencies
+            setup_config
+            log "NeoCode setup completed!"
+            ;;
+        "check")
+            check_dependencies
+            ;;
+        "help"|"--help"|"-h")
+            show_help
+            ;;
+        *)
+            error "Unknown command: $1"
+            show_help
+            exit 1
+            ;;
+    esac
+}
+
+main "$@"
