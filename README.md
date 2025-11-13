@@ -1,32 +1,113 @@
-# NeoCode - LazyVim Edition
+# NeoCode# NeoCode - LazyVim + tmux in Docker
 
-<div align="center">
-  <h3>🚀 A VSCode-like terminal development environment using LazyVim + tmux</h3>
-  <p>Modern, proven Neovim distribution with zero configuration hassle</p>
-</div>
 
-## 🎯 Overview
 
-NeoCode combines the power of **LazyVim** (a modern Neovim distribution) with **tmux** to create a VSCode-like development experience in the terminal. Instead of building custom configurations from scratch, we leverage the mature, battle-tested LazyVim ecosystem for reliability and modern features.
+**LazyVim + tmux in Docker. Simple.****Simple. Clean. Just LazyVim.**
 
-## ✨ Features
 
-- **🚀 LazyVim**: Modern Neovim distribution with VSCode-like features
-- **🪟 Windows-Style Shortcuts**: Familiar Ctrl+S, Ctrl+C, Ctrl+V, and more
+
+## What This Is## What This Is
+
+
+
+Stock LazyVim running in tmux. No custom configs, no bullshit.- **LazyVim**: Stock configuration from https://www.lazyvim.org/
+
+- **tmux**: For window management
+
+## Quick Start- **Docker**: So it runs anywhere
+
+
+
+```bashThat's it. No custom configs, no bullshit.
+
+# Build and start
+
+docker-compose up -d## ✨ Features
+
+
+
+# Enter container  - **🚀 LazyVim**: Modern Neovim distribution with VSCode-like features
+
+docker-compose exec neocode bash- **🪟 Windows-Style Shortcuts**: Familiar Ctrl+S, Ctrl+C, Ctrl+V, and more
+
 - **📑 Buffer-Based Tabs**: Open files shown as tabs (like VSCode), not Neovim tabs
-- **📁 Unified File Explorer**: One shared file tree, not duplicated per tab
-- **🎯 Smart Navigation**: Seamless movement between tmux panes and Neovim splits
-- **📊 Dashboard as Buffer**: LazyVim menu accessible as a tab, not an overlay
+
+# Start LazyVim- **📁 Unified File Explorer**: One shared file tree, not duplicated per tab
+
+nvim- **🎯 Smart Navigation**: Seamless movement between tmux panes and Neovim splits
+
+```- **📊 Dashboard as Buffer**: LazyVim menu accessible as a tab, not an overlay
+
 - **🔍 Fuzzy Finding**: Quick file search (Ctrl+P or Space+ff)
-- **⚡ Modern LSP**: Language servers, autocompletion, diagnostics
+
+## What You Get- **⚡ Modern LSP**: Language servers, autocompletion, diagnostics
+
 - **🎨 Beautiful UI**: Catppuccin theme with modern statusline and bufferline
-- **📊 Split Panes**: tmux integration for terminal workflow
-- **🔧 Works Out of the Box**: Optimized configuration included
-- **🌟 Extensible**: Easy to add plugins and customizations
 
-## 🚀 Quick Start
+✅ LazyVim (from https://www.lazyvim.org/)  - **📊 Split Panes**: tmux integration for terminal workflow
 
-### Docker (Recommended)
+✅ File explorer (`Space + e`)  - **🔧 Works Out of the Box**: Optimized configuration included
+
+✅ Fuzzy finder (`Space + Space`)  - **🌟 Extensible**: Easy to add plugins and customizations
+
+✅ LSP, auto-complete, syntax highlighting  
+
+✅ Terminal (`Ctrl + /`)  ## 🚀 Quick Start
+
+✅ Git integration  
+
+### 🐛 Dashboard Overlay Issue?
+
+## Key Shortcuts
+
+**If you're seeing the LazyVim dashboard covering your entire screen:**
+
+| Key | Action |- **Using Docker?** → **[Docker Debug Guide](DOCKER_DEBUG.md)** ← Start here!
+
+|-----|--------|- **Linux/macOS install?** → [Quick Fix Guide](QUICKFIX.md)
+
+| `Space` | Leader key |
+
+| `Space + e` | File explorer |### Automated Installation (Linux/macOS/WSL)
+
+| `Space + Space` | Find files |
+
+| `Ctrl + /` | Terminal |```bash
+
+# Clone the repository
+
+[Full shortcuts](https://www.lazyvim.org/keymaps)git clone https://github.com/Zapplightforce/NeoCode.git
+
+cd NeoCode
+
+## Customization
+
+# Run the installer
+
+LazyVim is already configured. To customize:chmod +x INSTALL.sh
+
+./INSTALL.sh
+
+https://www.lazyvim.org/configuration/general```
+
+
+
+## License### Manual Installation
+
+
+
+MIT```bash
+
+# Copy configuration files
+cp config/nvim-neocode.lua ~/.config/nvim/lua/config/neocode.lua
+cp config/plugins/neocode.lua ~/.config/nvim/lua/plugins/neocode.lua
+cp config/autocmds.lua ~/.config/nvim/lua/config/autocmds.lua
+
+# Restart Neovim
+nvim
+```
+
+### Docker (Alternative)
 
 ```bash
 # Build the container
